@@ -54,7 +54,7 @@
     <source src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" type="audio/ogg">
 </audio>
 
-<!-- Leaflet JS -->
+<!-- Leaflet -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <!-- Firebase -->
@@ -63,10 +63,11 @@
 
 <script>
 
-// 🔥 Firebase Config
+// 🔥 Firebase Config (Singapore Region Included)
 const firebaseConfig = {
   apiKey: "AIzaSyBrJVLDQ1iiIEXDLrHLnwsrwOVbQn1Dx6k",
   authDomain: "women-safety-app-62766.firebaseapp.com",
+  databaseURL: "https://women-safety-app-62766-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "women-safety-app-62766",
   storageBucket: "women-safety-app-62766.firebasestorage.app",
   messagingSenderId: "23376683007",
@@ -88,7 +89,7 @@ var currentLat, currentLng;
 var userMarker = null;
 var userId = "user_" + Math.floor(Math.random() * 100000);
 
-// 📍 Get Location
+// 📍 Live Location
 if (navigator.geolocation) {
 
     navigator.geolocation.watchPosition(
@@ -109,7 +110,7 @@ if (navigator.geolocation) {
 
             map.setView([currentLat, currentLng], 16);
 
-            // 🔥 Save to Firebase
+            // 🔥 Save to Firebase Realtime Database
             database.ref("users/" + userId).set({
                 latitude: currentLat,
                 longitude: currentLng,
@@ -127,14 +128,13 @@ if (navigator.geolocation) {
             timeout: 10000,
             maximumAge: 0
         }
-
     );
 
 } else {
     alert("Geolocation not supported by this browser.");
 }
 
-// 🚨 SOS Function
+// 🚨 SOS Button
 function triggerSOS() {
 
     document.getElementById("sosSound").play();
