@@ -16,7 +16,7 @@
         .controls {
             position: absolute;
             top: 10px;
-            left: 50px;
+            left: 10px;
             z-index: 1000;
             background: white;
             padding: 15px;
@@ -74,109 +74,113 @@
 
 <script>
 
-    var map = L.map('map').setView([26.4499, 80.3319], 13);
+var map = L.map('map').setView([26.4499, 80.3319], 13);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+}).addTo(map);
 
-    var currentLat, currentLng;
-    var userMarker;
-    var routingControl;
+var currentLat, currentLng;
+var userMarker;
+var routingControl;
 
-    // 🔴 LIVE LOCATION TRACKING
-    if (navigator.geolocation) {
-        navigator.geolocation.watchPosition(function(position) {
-            currentLat = position.coords.latitude;
-            currentLng = position.coords.longitude;
+// 📍 LIVE LOCATION
+if (navigator.geolocation) {
+    navigator.geolocation.watchPosition(function(position) {
+        currentLat = position.coords.latitude;
+        currentLng = position.coords.longitude;
 
-            if (!userMarker) {
-                userMarker = L.marker([currentLat, currentLng])
-                    .addTo(map)
-                    .bindPopup("You are here");
-            } else {
-                userMarker.setLatLng([currentLat, currentLng]);
-            }
-
-            map.setView([currentLat, currentLng], 15);
-        });
-    }
-
-    // 🚨 SOS FUNCTION (CALL + WHATSAPP)
-    function triggerSOS() {
-
-        document.getElementById("sosSound").play();
-
-        let confirmCall = confirm("🚨 Emergency! Do you want to call Police (112)?");
-
-        if (confirmCall) {
-            window.location.href = "tel:112";
+        if (!userMarker) {
+            userMarker = L.marker([currentLat, currentLng])
+                .addTo(map)
+                .bindPopup("You are here");
+        } else {
+            userMarker.setLatLng([currentLat, currentLng]);
         }
 
+        map.setView([currentLat, currentLng], 15);
+    });
+}
+
+// 🚨 SOS FUNCTION (Direct Call + WhatsApp)
+function triggerSOS() {
+
+    document.getElementById("sosSound").play();
+
+    // 📞 Direct 112 Call
+    window.location.href = "tel:112";
+
+    // 📲 WhatsApp Location Share after 2 seconds
+    setTimeout(function () {
         if (currentLat && currentLng) {
-            let message = `🚨 I need help! My live location: https://www.google.com/maps?q=${currentLat},${currentLng}`;
-            let whatsappURL = `https://wa.me/?text=${encodeURIComponent(message)}`;
+            let message = "🚨 I need help! My live location: https://www.google.com/maps?q=" 
+                + currentLat + "," + currentLng;
+
+            let whatsappURL = "https://api.whatsapp.com/send?text=" 
+                + encodeURIComponent(message);
+
             window.open(whatsappURL, "_blank");
         }
+    }, 2000);
+}
+
+// 👮 Police & 🏥 Hospital Markers
+var policeIcon = L.icon({
+    iconUrl: "https://cdn-icons-png.flaticon.com/512/2991/2991108.png",
+    iconSize: [30, 30]
+});
+
+var hospitalIcon = L.icon({
+    iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
+    iconSize: [30, 30]
+});
+
+L.marker([26.4550, 80.3500], {icon: policeIcon})
+    .addTo(map)
+    .bindPopup("Police Station");
+
+L.marker([26.4400, 80.3200], {icon: hospitalIcon})
+    .addTo(map)
+    .bindPopup("Hospital");
+
+// 🟢 SAFE ROUTE
+function findRoute() {
+
+    var destination = document.getElementById("destination").value;
+
+    if (!destination) {
+        alert("Please enter destination");
+        return;
     }
 
-    // 👮 Police & 🏥 Hospital Icons
-    var policeIcon = L.icon({
-        iconUrl: "https://cdn-icons-png.flaticon.com/512/2991/2991108.png",
-        iconSize: [30, 30]
-    });
+    fetch("https://nominatim.openstreetmap.org/search?format=json&q=" + destination)
+        .then(response => response.json())
+        .then(data => {
 
-    var hospitalIcon = L.icon({
-        iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
-        iconSize: [30, 30]
-    });
+            if (data.length === 0) {
+                alert("Location not found");
+                return;
+            }
 
-    L.marker([26.4550, 80.3500], {icon: policeIcon})
-        .addTo(map)
-        .bindPopup("Police Station");
+            var destLat = data[0].lat;
+            var destLng = data[0].lon;
 
-    L.marker([26.4400, 80.3200], {icon: hospitalIcon})
-        .addTo(map)
-        .bindPopup("Hospital");
+            if (routingControl) {
+                map.removeControl(routingControl);
+            }
 
-    // 🟢 SAFE ROUTE FUNCTION
-    function findRoute() {
-
-        var destination = document.getElementById("destination").value;
-
-        if (!destination) {
-            alert("Please enter destination");
-            return;
-        }
-
-        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${destination}`)
-            .then(response => response.json())
-            .then(data => {
-
-                if (data.length === 0) {
-                    alert("Location not found");
-                    return;
+            routingControl = L.Routing.control({
+                waypoints: [
+                    L.latLng(currentLat, currentLng),
+                    L.latLng(destLat, destLng)
+                ],
+                routeWhileDragging: false,
+                lineOptions: {
+                    styles: [{color: 'green', weight: 6}]
                 }
-
-                var destLat = data[0].lat;
-                var destLng = data[0].lon;
-
-                if (routingControl) {
-                    map.removeControl(routingControl);
-                }
-
-                routingControl = L.Routing.control({
-                    waypoints: [
-                        L.latLng(currentLat, currentLng),
-                        L.latLng(destLat, destLng)
-                    ],
-                    routeWhileDragging: false,
-                    lineOptions: {
-                        styles: [{color: 'green', weight: 6}]
-                    }
-                }).addTo(map);
-            });
-    }
+            }).addTo(map);
+        });
+}
 
 </script>
 
