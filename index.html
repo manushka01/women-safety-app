@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Women Safety Navigation</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { height: 100vh; width: 100%; }
+
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 50px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            width: 250px;
+        }
+
+        input {
+            padding: 6px;
+            margin: 5px 0;
+            width: 100%;
+        }
+
+        button {
+            padding: 8px;
+            margin-top: 5px;
+            cursor: pointer;
+            width: 100%;
+            border: none;
+            border-radius: 5px;
+        }
+
+        .route-btn {
+            background: #2ecc71;
+            color: white;
+        }
+
+        .sos-btn {
+            background: red;
+            color: white;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="controls">
+    <h3>Women Safety</h3>
+    <input type="text" id="destination" placeholder="Enter destination">
+    <button class="route-btn" onclick="findRoute()">Find Safe Route</button>
+    <button class="sos-btn" onclick="triggerSOS()">SOS</button>
+</div>
+
+<div id="map"></div>
+
+<!-- SOS Sound -->
+<audio id="sosSound">
+    <source src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" type="audio/ogg">
+</audio>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+
+<script>
+
+    var map = L.map('map').setView([26.4499, 80.3319], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    var currentLat, currentLng;
+    var userMarker;
+    var routingControl;
+
+    // 🔴 LIVE LOCATION TRACKING
+    if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(function(position) {
+            currentLat = position.coords.latitude;
+            currentLng = position.coords.longitude;
+
+            if (!userMarker) {
+                userMarker = L.marker([currentLat, currentLng])
+                    .addTo(map)
+                    .bindPopup("You are here");
+            } else {
+                userMarker.setLatLng([currentLat, currentLng]);
+            }
+
+            map.setView([currentLat, currentLng], 15);
+        });
+    }
+
+    // 🚨 SOS FUNCTION (CALL + WHATSAPP)
+    function triggerSOS() {
+
+        document.getElementById("sosSound").play();
+
+        let confirmCall = confirm("🚨 Emergency! Do you want to call Police (112)?");
+
+        if (confirmCall) {
+            window.location.href = "tel:112";
+        }
+
+        if (currentLat && currentLng) {
+            let message = `🚨 I need help! My live location: https://www.google.com/maps?q=${currentLat},${currentLng}`;
+            let whatsappURL = `https://wa.me/?text=${encodeURIComponent(message)}`;
+            window.open(whatsappURL, "_blank");
+        }
+    }
+
+    // 👮 Police & 🏥 Hospital Icons
+    var policeIcon = L.icon({
+        iconUrl: "https://cdn-icons-png.flaticon.com/512/2991/2991108.png",
+        iconSize: [30, 30]
+    });
+
+    var hospitalIcon = L.icon({
+        iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
+        iconSize: [30, 30]
+    });
+
+    L.marker([26.4550, 80.3500], {icon: policeIcon})
+        .addTo(map)
+        .bindPopup("Police Station");
+
+    L.marker([26.4400, 80.3200], {icon: hospitalIcon})
+        .addTo(map)
+        .bindPopup("Hospital");
+
+    // 🟢 SAFE ROUTE FUNCTION
+    function findRoute() {
+
+        var destination = document.getElementById("destination").value;
+
+        if (!destination) {
+            alert("Please enter destination");
+            return;
+        }
+
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${destination}`)
+            .then(response => response.json())
+            .then(data => {
+
+                if (data.length === 0) {
+                    alert("Location not found");
+                    return;
+                }
+
+                var destLat = data[0].lat;
+                var destLng = data[0].lon;
+
+                if (routingControl) {
+                    map.removeControl(routingControl);
+                }
+
+                routingControl = L.Routing.control({
+                    waypoints: [
+                        L.latLng(currentLat, currentLng),
+                        L.latLng(destLat, destLng)
+                    ],
+                    routeWhileDragging: false,
+                    lineOptions: {
+                        styles: [{color: 'green', weight: 6}]
+                    }
+                }).addTo(map);
+            });
+    }
+
+</script>
+
+</body>
+</html>
