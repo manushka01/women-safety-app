@@ -102,26 +102,26 @@ if (navigator.geolocation) {
     });
 }
 
-// 🚨 SOS FUNCTION (Direct Call + WhatsApp)
+// 🚨 SOS FUNCTION (WhatsApp first, then Call)
 function triggerSOS() {
 
     document.getElementById("sosSound").play();
 
-    // 📞 Direct 112 Call
-    window.location.href = "tel:112";
+    if (currentLat && currentLng) {
 
-    // 📲 WhatsApp Location Share after 2 seconds
+        let message = "🚨 I need help! My live location: https://www.google.com/maps?q=" 
+            + currentLat + "," + currentLng;
+
+        let whatsappURL = "https://api.whatsapp.com/send?text=" 
+            + encodeURIComponent(message);
+
+        window.open(whatsappURL, "_blank");
+    }
+
+    // 3 sec baad 112 call
     setTimeout(function () {
-        if (currentLat && currentLng) {
-            let message = "🚨 I need help! My live location: https://www.google.com/maps?q=" 
-                + currentLat + "," + currentLng;
-
-            let whatsappURL = "https://api.whatsapp.com/send?text=" 
-                + encodeURIComponent(message);
-
-            window.open(whatsappURL, "_blank");
-        }
-    }, 2000);
+        window.location.href = "tel:112";
+    }, 3000);
 }
 
 // 👮 Police & 🏥 Hospital Markers
