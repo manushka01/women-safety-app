@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- Leaflet CSS -->
+    <!-- Leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
 
@@ -25,54 +25,52 @@
             width: 250px;
         }
 
-        input {
-            padding: 6px;
-            margin: 5px 0;
-            width: 100%;
-        }
-
         button {
             padding: 8px;
             margin-top: 5px;
-            cursor: pointer;
             width: 100%;
             border: none;
             border-radius: 5px;
+            cursor: pointer;
         }
 
-        .route-btn {
-            background: #2ecc71;
-            color: white;
-        }
-
-        .sos-btn {
-            background: red;
-            color: white;
-            font-weight: bold;
-        }
+        .route-btn { background: #2ecc71; color: white; }
+        .sos-btn { background: red; color: white; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="controls">
     <h3>Women Safety</h3>
-    <input type="text" id="destination" placeholder="Enter destination">
-    <button class="route-btn" onclick="findRoute()">Find Safe Route</button>
     <button class="sos-btn" onclick="triggerSOS()">SOS</button>
 </div>
 
 <div id="map"></div>
 
-<!-- SOS Sound -->
 <audio id="sosSound">
     <source src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" type="audio/ogg">
 </audio>
 
-<!-- Scripts -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+
+<!-- Firebase Scripts -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
 <script>
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBrJVLDQ1iiIEXDLrHLnwsrwOVbQn1Dx6k",
+  authDomain: "women-safety-app-62766.firebaseapp.com",
+  projectId: "women-safety-app-62766",
+  storageBucket: "women-safety-app-62766.firebasestorage.app",
+  messagingSenderId: "23376683007",
+  appId: "1:23376683007:web:7c5acf53b9fa53491751ca",
+  measurementId: "G-NHKJCFHNKD"
+};
+
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
 
 var map = L.map('map').setView([26.4499, 80.3319], 13);
 
@@ -81,28 +79,30 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 var currentLat, currentLng;
-var userMarker;
-var routingControl;
+var userId = "user_" + Math.floor(Math.random() * 100000);
 
-// 📍 LIVE LOCATION
 if (navigator.geolocation) {
     navigator.geolocation.watchPosition(function(position) {
+
         currentLat = position.coords.latitude;
         currentLng = position.coords.longitude;
 
-        if (!userMarker) {
-            userMarker = L.marker([currentLat, currentLng])
-                .addTo(map)
-                .bindPopup("You are here");
-        } else {
-            userMarker.setLatLng([currentLat, currentLng]);
-        }
+        L.marker([currentLat, currentLng])
+            .addTo(map)
+            .bindPopup("You are here");
 
         map.setView([currentLat, currentLng], 15);
+
+        // 🔥 SAVE LIVE LOCATION TO FIREBASE
+        database.ref("users/" + userId).set({
+            latitude: currentLat,
+            longitude: currentLng,
+            timestamp: Date.now()
+        });
+
     });
 }
 
-// 🚨 SOS FUNCTION (WhatsApp first, then Call)
 function triggerSOS() {
 
     document.getElementById("sosSound").play();
@@ -112,74 +112,12 @@ function triggerSOS() {
         let message = "🚨 I need help! My live location: https://www.google.com/maps?q=" 
             + currentLat + "," + currentLng;
 
-        let whatsappURL = "https://api.whatsapp.com/send?text=" 
-            + encodeURIComponent(message);
-
-        window.open(whatsappURL, "_blank");
+        window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent(message), "_blank");
     }
 
-    // 3 sec baad 112 call
     setTimeout(function () {
         window.location.href = "tel:112";
     }, 3000);
-}
-
-// 👮 Police & 🏥 Hospital Markers
-var policeIcon = L.icon({
-    iconUrl: "https://cdn-icons-png.flaticon.com/512/2991/2991108.png",
-    iconSize: [30, 30]
-});
-
-var hospitalIcon = L.icon({
-    iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
-    iconSize: [30, 30]
-});
-
-L.marker([26.4550, 80.3500], {icon: policeIcon})
-    .addTo(map)
-    .bindPopup("Police Station");
-
-L.marker([26.4400, 80.3200], {icon: hospitalIcon})
-    .addTo(map)
-    .bindPopup("Hospital");
-
-// 🟢 SAFE ROUTE
-function findRoute() {
-
-    var destination = document.getElementById("destination").value;
-
-    if (!destination) {
-        alert("Please enter destination");
-        return;
-    }
-
-    fetch("https://nominatim.openstreetmap.org/search?format=json&q=" + destination)
-        .then(response => response.json())
-        .then(data => {
-
-            if (data.length === 0) {
-                alert("Location not found");
-                return;
-            }
-
-            var destLat = data[0].lat;
-            var destLng = data[0].lon;
-
-            if (routingControl) {
-                map.removeControl(routingControl);
-            }
-
-            routingControl = L.Routing.control({
-                waypoints: [
-                    L.latLng(currentLat, currentLng),
-                    L.latLng(destLat, destLng)
-                ],
-                routeWhileDragging: false,
-                lineOptions: {
-                    styles: [{color: 'green', weight: 6}]
-                }
-            }).addTo(map);
-        });
 }
 
 </script>
