@@ -21,7 +21,7 @@
             padding: 15px;
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            width: 240px;
+            width: 220px;
         }
 
         button {
@@ -32,18 +32,22 @@
             border-radius: 6px;
             cursor: pointer;
             font-size: 14px;
+            font-weight: bold;
         }
 
         .sos-btn {
             background: red;
             color: white;
-            font-weight: bold;
         }
 
         .route-btn {
             background: #007bff;
             color: white;
-            font-weight: bold;
+        }
+
+        .heat-btn {
+            background: orange;
+            color: white;
         }
     </style>
 </head>
@@ -53,10 +57,8 @@
     <h3>Women Safety</h3>
 
     <button class="sos-btn" onclick="triggerSOS()">🚨 SOS</button>
-    <button onclick="findNearby('police')">👮 Nearby Police</button>
-    <button onclick="findNearby('hospital')">🏥 Nearby Hospital</button>
     <button class="route-btn" onclick="safeRoute()">🛣 Safe Route</button>
-    <button onclick="showHeatmap()">🔥 Danger Zones</button>
+    <button class="heat-btn" onclick="showHeatmap()">🔥 Danger Zones</button>
 </div>
 
 <div id="map"></div>
@@ -94,7 +96,6 @@ navigator.geolocation.watchPosition(function(position) {
     }
 
     map.setView([currentLat, currentLng], 15);
-
 });
 
 // 🚨 SOS
@@ -111,41 +112,7 @@ function triggerSOS() {
     }
 }
 
-// 🔎 Nearby Search
-function findNearby(type) {
-
-    if (!currentLat) {
-        alert("Location not detected yet");
-        return;
-    }
-
-    let query = `
-    [out:json];
-    node["amenity"="${type}"](around:10000,${currentLat},${currentLng});
-    out;
-    `;
-
-    fetch("https://overpass-api.de/api/interpreter", {
-        method: "POST",
-        body: query
-    })
-    .then(res => res.json())
-    .then(data => {
-
-        if (data.elements.length === 0) {
-            alert("No " + type + " found within 10km");
-            return;
-        }
-
-        data.elements.forEach(place => {
-            L.marker([place.lat, place.lon])
-                .addTo(map)
-                .bindPopup(type.toUpperCase());
-        });
-    });
-}
-
-// 🛣 Smart Safe Route (Police First, Else Hospital)
+// 🛣 Safe Route (Police first → else Hospital)
 function safeRoute() {
 
     if (!currentLat) {
@@ -153,16 +120,14 @@ function safeRoute() {
         return;
     }
 
-    // First try police
-    searchAndRoute("police", function(found) {
+    searchRoute("police", function(found) {
         if (!found) {
-            // If no police found, try hospital
-            searchAndRoute("hospital");
+            searchRoute("hospital");
         }
     });
 }
 
-function searchAndRoute(type, callback) {
+function searchRoute(type, callback) {
 
     let query = `
     [out:json];
