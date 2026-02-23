@@ -21,7 +21,15 @@
             padding: 15px;
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            width: 220px;
+            width: 240px;
+        }
+
+        input {
+            width: 100%;
+            padding: 8px;
+            margin-top: 8px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
         }
 
         button {
@@ -35,20 +43,10 @@
             font-weight: bold;
         }
 
-        .sos-btn {
-            background: red;
-            color: white;
-        }
-
-        .route-btn {
-            background: #007bff;
-            color: white;
-        }
-
-        .heat-btn {
-            background: orange;
-            color: white;
-        }
+        .sos-btn { background: red; color: white; }
+        .route-btn { background: #007bff; color: white; }
+        .heat-btn { background: orange; color: white; }
+        .search-btn { background: #28a745; color: white; }
     </style>
 </head>
 <body>
@@ -59,6 +57,9 @@
     <button class="sos-btn" onclick="triggerSOS()">🚨 SOS</button>
     <button class="route-btn" onclick="safeRoute()">🛣 Safe Route</button>
     <button class="heat-btn" onclick="showHeatmap()">🔥 Danger Zones</button>
+
+    <input type="text" id="locationInput" placeholder="Search location...">
+    <button class="search-btn" onclick="searchLocation()">🔎 Search</button>
 </div>
 
 <div id="map"></div>
@@ -100,21 +101,17 @@ navigator.geolocation.watchPosition(function(position) {
 
 // 🚨 SOS
 function triggerSOS() {
-
     if (currentLat && currentLng) {
-
         let message = "🚨 I need help! My location: https://www.google.com/maps?q=" 
             + currentLat + "," + currentLng;
 
         window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent(message), "_blank");
-
         setTimeout(() => { window.location.href = "tel:112"; }, 2000);
     }
 }
 
-// 🛣 Safe Route (Police first → else Hospital)
+// 🛣 Safe Route
 function safeRoute() {
-
     if (!currentLat) {
         alert("Location not detected yet");
         return;
@@ -165,13 +162,9 @@ function searchRoute(type, callback) {
     });
 }
 
-// 🔥 Danger Heatmap
+// 🔥 Heatmap
 function showHeatmap() {
-
-    if (!currentLat) {
-        alert("Location not detected yet");
-        return;
-    }
+    if (!currentLat) return;
 
     let dangerPoints = [
         [currentLat + 0.01, currentLng + 0.01, 0.8],
@@ -180,15 +173,43 @@ function showHeatmap() {
         [currentLat - 0.02, currentLng - 0.02, 1]
     ];
 
-    if (heatLayer) {
-        map.removeLayer(heatLayer);
-    }
+    if (heatLayer) map.removeLayer(heatLayer);
 
     heatLayer = L.heatLayer(dangerPoints, {
         radius: 25,
         blur: 20,
         maxZoom: 17
     }).addTo(map);
+}
+
+// 🔎 Search Location Feature
+function searchLocation() {
+
+    let query = document.getElementById("locationInput").value;
+
+    if (!query) {
+        alert("Enter a location to search");
+        return;
+    }
+
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`)
+    .then(response => response.json())
+    .then(data => {
+
+        if (data.length === 0) {
+            alert("Location not found");
+            return;
+        }
+
+        let lat = data[0].lat;
+        let lon = data[0].lon;
+
+        L.marker([lat, lon]).addTo(map)
+            .bindPopup("Searched Location")
+            .openPopup();
+
+        map.setView([lat, lon], 15);
+    });
 }
 
 </script>
