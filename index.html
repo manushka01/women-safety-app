@@ -10,14 +10,12 @@
 
   <style>
     body { margin: 0; font-family: Arial; transition: 0.3s; }
-    .dark { background: #121212; color: white; }
-
     #map { height: 90vh; width: 100%; }
 
     .top-bar {
       padding: 10px;
       text-align: center;
-      background: #ff4d6d;
+      background: #b30021;
       color: white;
     }
 
@@ -49,6 +47,7 @@
   <button onclick="searchLocation()">Search</button>
 
   <button onclick="safeRoute()">Safe Route</button>
+  <button onclick="shareLiveLocation()">🔵 Share Live</button>
 </div>
 
 <div id="map"></div>
@@ -61,29 +60,58 @@
 
   var map = L.map('map').setView([26.8467, 80.9462], 13);
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors'
-  }).addTo(map);
+  var lightLayer = L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution: '© OpenStreetMap contributors' }
+  ).addTo(map);
 
+  var darkLayer = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    { attribution: '© OpenStreetMap contributors' }
+  );
+
+  var isDark = false;
   var userLat, userLng;
   var routingControl;
+  var userMarker;
 
-  // 📍 Get User Location
-  navigator.geolocation.getCurrentPosition(function(position) {
-    userLat = position.coords.latitude;
-    userLng = position.coords.longitude;
+  // 📍 High Accuracy Location
+  navigator.geolocation.watchPosition(
+    function(position) {
+      userLat = position.coords.latitude;
+      userLng = position.coords.longitude;
 
-    L.marker([userLat, userLng])
-      .addTo(map)
-      .bindPopup("You are here")
-      .openPopup();
+      if (userMarker) {
+        userMarker.setLatLng([userLat, userLng]);
+      } else {
+        userMarker = L.marker([userLat, userLng])
+          .addTo(map)
+          .bindPopup("You are here")
+          .openPopup();
+      }
 
-    map.setView([userLat, userLng], 15);
-  });
+      map.setView([userLat, userLng], 16);
+    },
+    function(error) {
+      alert("Location permission denied");
+    },
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 5000
+    }
+  );
 
   // 🌙 Dark Mode
   function toggleDarkMode() {
-    document.body.classList.toggle("dark");
+    if (isDark) {
+      map.removeLayer(darkLayer);
+      map.addLayer(lightLayer);
+    } else {
+      map.removeLayer(lightLayer);
+      map.addLayer(darkLayer);
+    }
+    isDark = !isDark;
   }
 
   // 🚨 SOS
@@ -92,11 +120,13 @@
 
     let link = "https://www.google.com/maps?q=" + userLat + "," + userLng;
 
-    window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent("🚨 I need help! My location: " + link));
+    window.open("https://api.whatsapp.com/send?text=" +
+      encodeURIComponent("🚨 I need help! My location: " + link));
+
     setTimeout(() => { window.location.href = "tel:112"; }, 2000);
   }
 
-  // 🔎 Search
+  // 🔎 Search Location
   function searchLocation() {
     var location = document.getElementById("searchInput").value;
     if (!location) return alert("Enter location");
@@ -120,7 +150,7 @@
       });
   }
 
-  // 🛣 Real Road Route
+  // 🛣 Safe Route
   function safeRoute() {
     if (!userLat) return alert("Location not ready");
 
@@ -137,6 +167,22 @@
       ],
       routeWhileDragging: false
     }).addTo(map);
+  }
+
+  // 🔵 Share Live Location
+  function shareLiveLocation() {
+    if (!userLat) {
+      alert("Location not ready yet");
+      return;
+    }
+
+    var liveLink = window.location.origin +
+      "/guardian.html?lat=" + userLat + "&lng=" + userLng;
+
+    var message = "Track my live location:\n" + liveLink;
+
+    window.open("https://api.whatsapp.com/send?text=" +
+      encodeURIComponent(message));
   }
 
 </script>
