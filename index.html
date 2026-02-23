@@ -1,234 +1,171 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Women Safety Navigation</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Women Safety Map</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css"/>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
-    <style>
-        body { margin: 0; padding: 0; transition: 0.3s; }
-        #map { height: 100vh; width: 100%; }
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial;
+      transition: 0.3s;
+    }
 
-        .controls {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            z-index: 1000;
-            background: white;
-            padding: 15px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            width: 240px;
-            transition: 0.3s;
-        }
+    .dark {
+      background: #121212;
+      color: white;
+    }
 
-        input {
-            width: 100%;
-            padding: 8px;
-            margin-top: 8px;
-            border-radius: 6px;
-            border: 1px solid #ccc;
-        }
+    #map {
+      height: 80vh;
+      width: 100%;
+    }
 
-        button {
-            padding: 10px;
-            margin-top: 8px;
-            width: 100%;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: bold;
-        }
+    .top-bar {
+      padding: 10px;
+      text-align: center;
+      background: #ff4d6d;
+      color: white;
+    }
 
-        .sos-btn { background: red; color: white; }
-        .route-btn { background: #007bff; color: white; }
-        .heat-btn { background: orange; color: white; }
-        .search-btn { background: #28a745; color: white; }
-        .share-btn { background: #6f42c1; color: white; }
-        .dark-btn { background: black; color: white; }
+    button {
+      padding: 8px 12px;
+      margin: 5px;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+    }
 
-        .dark-mode {
-            background: #121212;
-            color: white;
-        }
+    input {
+      padding: 8px;
+      margin: 5px;
+      width: 200px;
+    }
 
-        .dark-mode .controls {
-            background: #1e1e1e;
-            color: white;
-        }
-    </style>
+    .dark .top-bar {
+      background: black;
+    }
+  </style>
 </head>
+
 <body>
 
-<div class="controls">
-    <h3>Women Safety</h3>
+<div class="top-bar">
+  <h2>Women Safety Map</h2>
 
-    <button class="sos-btn" onclick="triggerSOS()">🚨 SOS</button>
-    <button class="route-btn" onclick="safeRoute()">🛣 Safe Route</button>
-    <button class="heat-btn" onclick="showHeatmap()">🔥 Danger Zones</button>
+  <button onclick="toggleDarkMode()">🌙 Dark Mode</button>
 
-    <input type="text" id="locationInput" placeholder="Search location...">
-    <button class="search-btn" onclick="searchLocation()">🔎 Search</button>
+  <input type="text" id="searchInput" placeholder="Search location">
+  <button onclick="searchLocation()">Search</button>
 
-    <button class="share-btn" onclick="shareLocation()">📤 Share My Location</button>
-    <button class="dark-btn" onclick="toggleDarkMode()">🌙 Dark Mode</button>
+  <button onclick="safeRoute()">Safe Route</button>
+  <button onclick="guardianPage()">Guardian Live</button>
 </div>
 
 <div id="map"></div>
 
+<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <script>
 
-var map = L.map('map').setView([20.5937, 78.9629], 5);
+  // 🔥 Firebase Config (YOUR PROJECT CONFIG YAHI RAHEGA)
+  var firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    databaseURL: "YOUR_DATABASE_URL",
+    projectId: "YOUR_PROJECT",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "XXXX",
+    appId: "XXXX"
+  };
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors'
-}).addTo(map);
+  firebase.initializeApp(firebaseConfig);
+  var database = firebase.database();
 
-var currentLat, currentLng;
-var userMarker = null;
-var routingControl = null;
-var heatLayer = null;
+  // 🌍 Map Setup
+  var map = L.map('map').setView([26.8467, 80.9462], 13);
 
-// 📍 Live Location
-navigator.geolocation.watchPosition(function(position) {
-    currentLat = position.coords.latitude;
-    currentLng = position.coords.longitude;
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: 'Map data © OpenStreetMap'
+  }).addTo(map);
 
-    if (userMarker) {
-        userMarker.setLatLng([currentLat, currentLng]);
-    } else {
-        userMarker = L.marker([currentLat, currentLng])
-            .addTo(map)
-            .bindPopup("You are here")
-            .openPopup();
-    }
+  // 📍 User Location
+  navigator.geolocation.getCurrentPosition(function(position) {
+    var lat = position.coords.latitude;
+    var lng = position.coords.longitude;
 
-    map.setView([currentLat, currentLng], 15);
-});
+    L.marker([lat, lng]).addTo(map)
+      .bindPopup("You are here")
+      .openPopup();
 
-// 🚨 SOS
-function triggerSOS() {
-    if (currentLat && currentLng) {
-        let message = "🚨 I need help! My location: https://www.google.com/maps?q=" 
-            + currentLat + "," + currentLng;
+    map.setView([lat, lng], 15);
 
-        window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent(message), "_blank");
-        setTimeout(() => { window.location.href = "tel:112"; }, 2000);
-    }
-}
-
-// 🛣 Safe Route
-function safeRoute() {
-    if (!currentLat) return alert("Location not detected yet");
-
-    searchRoute("police", function(found) {
-        if (!found) searchRoute("hospital");
+    database.ref("users").push({
+      latitude: lat,
+      longitude: lng
     });
-}
+  });
 
-function searchRoute(type, callback) {
+  // 🌙 Dark Mode
+  function toggleDarkMode() {
+    document.body.classList.toggle("dark");
+  }
 
-    let query = `
-    [out:json];
-    node["amenity"="${type}"](around:10000,${currentLat},${currentLng});
-    out 1;
-    `;
+  // 🔎 Search Location
+  function searchLocation() {
+    var location = document.getElementById("searchInput").value;
 
-    fetch("https://overpass-api.de/api/interpreter", {
-        method: "POST",
-        body: query
-    })
-    .then(res => res.json())
-    .then(data => {
-
-        if (data.elements.length === 0) {
-            if (callback) callback(false);
-            return;
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${location}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.length > 0) {
+          var lat = data[0].lat;
+          var lon = data[0].lon;
+          map.setView([lat, lon], 15);
+          L.marker([lat, lon]).addTo(map)
+            .bindPopup(location)
+            .openPopup();
+        } else {
+          alert("Location not found");
         }
+      });
+  }
 
-        let place = data.elements[0];
+  // 🛣 Safe Route (Simple Line Route)
+  function safeRoute() {
+    navigator.geolocation.getCurrentPosition(function(position) {
+      var userLat = position.coords.latitude;
+      var userLng = position.coords.longitude;
 
-        if (routingControl) map.removeControl(routingControl);
+      var destination = map.getCenter();
 
-        routingControl = L.Routing.control({
-            waypoints: [
-                L.latLng(currentLat, currentLng),
-                L.latLng(place.lat, place.lon)
-            ],
-            routeWhileDragging: false
-        }).addTo(map);
-
-        if (callback) callback(true);
+      L.polyline([
+        [userLat, userLng],
+        [destination.lat, destination.lng]
+      ], {color: 'green'}).addTo(map);
     });
-}
+  }
 
-// 🔥 Heatmap
-function showHeatmap() {
-    if (!currentLat) return;
+  // 🔵 Guardian Live Page
+  function guardianPage() {
+    window.open("guardian.html", "_blank");
+  }
 
-    let dangerPoints = [
-        [currentLat + 0.01, currentLng + 0.01, 0.8],
-        [currentLat - 0.015, currentLng + 0.02, 0.9],
-        [currentLat + 0.02, currentLng - 0.01, 0.7],
-        [currentLat - 0.02, currentLng - 0.02, 1]
-    ];
-
-    if (heatLayer) map.removeLayer(heatLayer);
-
-    heatLayer = L.heatLayer(dangerPoints, {
-        radius: 25,
-        blur: 20,
-        maxZoom: 17
-    }).addTo(map);
-}
-
-// 🔎 Search
-function searchLocation() {
-
-    let query = document.getElementById("locationInput").value;
-    if (!query) return alert("Enter location");
-
-    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`)
-    .then(response => response.json())
-    .then(data => {
-
-        if (data.length === 0) return alert("Location not found");
-
-        let lat = data[0].lat;
-        let lon = data[0].lon;
-
-        L.marker([lat, lon]).addTo(map)
-            .bindPopup("Searched Location")
-            .openPopup();
-
-        map.setView([lat, lon], 15);
-    });
-}
-
-// 📤 Share Location
-function shareLocation() {
-    if (!currentLat) return alert("Location not ready");
-
-    let link = `https://www.google.com/maps?q=${currentLat},${currentLng}`;
-
-    navigator.clipboard.writeText(link);
-    alert("Location link copied!");
-
-    window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent(link), "_blank");
-}
-
-// 🌙 Dark Mode
-function toggleDarkMode() {
-    document.body.classList.toggle("dark-mode");
-}
+  // 🔥 Danger Heatmap Example
+  var heat = L.heatLayer([
+    [26.8467, 80.9462, 0.8],
+    [26.8500, 80.9500, 0.5],
+    [26.8400, 80.9400, 0.7]
+  ], {radius: 25}).addTo(map);
 
 </script>
 
