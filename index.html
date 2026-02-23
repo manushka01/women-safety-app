@@ -5,6 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+    <!-- Leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css"/>
 
@@ -51,12 +52,14 @@
     <button onclick="findNearby('hospital')">🏥 Nearby Hospital</button>
     <button onclick="routeTo('police')">🛣 Route to Police</button>
     <button onclick="routeTo('hospital')">🛣 Route to Hospital</button>
+    <button onclick="showHeatmap()">🔥 Danger Zones</button>
 </div>
 
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 
 <script>
 
@@ -69,6 +72,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 var currentLat, currentLng;
 var userMarker = null;
 var routingControl = null;
+var heatLayer = null;
 
 // 📍 Live Location
 navigator.geolocation.watchPosition(function(position) {
@@ -86,6 +90,7 @@ navigator.geolocation.watchPosition(function(position) {
     }
 
     map.setView([currentLat, currentLng], 15);
+
 });
 
 // 🚨 SOS
@@ -97,11 +102,12 @@ function triggerSOS() {
             + currentLat + "," + currentLng;
 
         window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent(message), "_blank");
+
         setTimeout(() => { window.location.href = "tel:112"; }, 2000);
     }
 }
 
-// 🔎 Nearby Search (Radius Increased to 10km)
+// 🔎 Nearby Search (10km radius)
 function findNearby(type) {
 
     if (!currentLat) {
@@ -135,7 +141,7 @@ function findNearby(type) {
     });
 }
 
-// 🛣 Universal Route Function
+// 🛣 Universal Route
 function routeTo(type) {
 
     if (!currentLat) {
@@ -175,6 +181,32 @@ function routeTo(type) {
             routeWhileDragging: false
         }).addTo(map);
     });
+}
+
+// 🔥 Danger Zone Heatmap
+function showHeatmap() {
+
+    if (!currentLat) {
+        alert("Location not detected yet");
+        return;
+    }
+
+    let dangerPoints = [
+        [currentLat + 0.01, currentLng + 0.01, 0.8],
+        [currentLat - 0.015, currentLng + 0.02, 0.9],
+        [currentLat + 0.02, currentLng - 0.01, 0.7],
+        [currentLat - 0.02, currentLng - 0.02, 1]
+    ];
+
+    if (heatLayer) {
+        map.removeLayer(heatLayer);
+    }
+
+    heatLayer = L.heatLayer(dangerPoints, {
+        radius: 25,
+        blur: 20,
+        maxZoom: 17
+    }).addTo(map);
 }
 
 </script>
