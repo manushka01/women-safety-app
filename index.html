@@ -20,7 +20,7 @@
     }
 
     #map {
-      height: 80vh;
+      height: 90vh;
       width: 100%;
     }
 
@@ -44,10 +44,6 @@
       margin: 5px;
       width: 200px;
     }
-
-    .dark .top-bar {
-      background: black;
-    }
   </style>
 </head>
 
@@ -58,61 +54,42 @@
 
   <button onclick="toggleDarkMode()">🌙 Dark Mode</button>
 
+  <button onclick="triggerSOS()">🚨 SOS</button>
+
   <input type="text" id="searchInput" placeholder="Search location">
   <button onclick="searchLocation()">Search</button>
 
   <button onclick="safeRoute()">Safe Route</button>
-  <button onclick="guardianPage()">Guardian Live</button>
 </div>
 
 <div id="map"></div>
 
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
-
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <script>
-
-  // 🔥 Firebase Config (YOUR PROJECT CONFIG YAHI RAHEGA)
-  var firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT.firebaseapp.com",
-    databaseURL: "YOUR_DATABASE_URL",
-    projectId: "YOUR_PROJECT",
-    storageBucket: "YOUR_PROJECT.appspot.com",
-    messagingSenderId: "XXXX",
-    appId: "XXXX"
-  };
-
-  firebase.initializeApp(firebaseConfig);
-  var database = firebase.database();
 
   // 🌍 Map Setup
   var map = L.map('map').setView([26.8467, 80.9462], 13);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: 'Map data © OpenStreetMap'
+    attribution: '© OpenStreetMap contributors'
   }).addTo(map);
 
-  // 📍 User Location
-  navigator.geolocation.getCurrentPosition(function(position) {
-    var lat = position.coords.latitude;
-    var lng = position.coords.longitude;
+  var userLat, userLng;
+  var routeLine;
 
-    L.marker([lat, lng]).addTo(map)
+  // 📍 Get Location
+  navigator.geolocation.getCurrentPosition(function(position) {
+    userLat = position.coords.latitude;
+    userLng = position.coords.longitude;
+
+    L.marker([userLat, userLng])
+      .addTo(map)
       .bindPopup("You are here")
       .openPopup();
 
-    map.setView([lat, lng], 15);
-
-    database.ref("users").push({
-      latitude: lat,
-      longitude: lng
-    });
+    map.setView([userLat, userLng], 15);
   });
 
   // 🌙 Dark Mode
@@ -120,9 +97,24 @@
     document.body.classList.toggle("dark");
   }
 
+  // 🚨 SOS
+  function triggerSOS() {
+    if (!userLat) {
+      alert("Location not ready yet");
+      return;
+    }
+
+    let link = "https://www.google.com/maps?q=" + userLat + "," + userLng;
+
+    window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent("🚨 I need help! My location: " + link));
+    setTimeout(() => { window.location.href = "tel:112"; }, 2000);
+  }
+
   // 🔎 Search Location
   function searchLocation() {
     var location = document.getElementById("searchInput").value;
+
+    if (!location) return alert("Enter location");
 
     fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${location}`)
       .then(res => res.json())
@@ -131,7 +123,8 @@
           var lat = data[0].lat;
           var lon = data[0].lon;
           map.setView([lat, lon], 15);
-          L.marker([lat, lon]).addTo(map)
+          L.marker([lat, lon])
+            .addTo(map)
             .bindPopup(location)
             .openPopup();
         } else {
@@ -140,32 +133,21 @@
       });
   }
 
-  // 🛣 Safe Route (Simple Line Route)
+  // 🛣 Safe Route (Simple Line)
   function safeRoute() {
-    navigator.geolocation.getCurrentPosition(function(position) {
-      var userLat = position.coords.latitude;
-      var userLng = position.coords.longitude;
+    if (!userLat) return alert("Location not ready");
 
-      var destination = map.getCenter();
+    var center = map.getCenter();
 
-      L.polyline([
-        [userLat, userLng],
-        [destination.lat, destination.lng]
-      ], {color: 'green'}).addTo(map);
-    });
+    if (routeLine) {
+      map.removeLayer(routeLine);
+    }
+
+    routeLine = L.polyline([
+      [userLat, userLng],
+      [center.lat, center.lng]
+    ], {color: 'green'}).addTo(map);
   }
-
-  // 🔵 Guardian Live Page
-  function guardianPage() {
-    window.open("guardian.html", "_blank");
-  }
-
-  // 🔥 Danger Heatmap Example
-  var heat = L.heatLayer([
-    [26.8467, 80.9462, 0.8],
-    [26.8500, 80.9500, 0.5],
-    [26.8400, 80.9400, 0.7]
-  ], {radius: 25}).addTo(map);
 
 </script>
 
