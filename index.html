@@ -7,6 +7,7 @@
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css"/>
 
     <style>
         body { margin: 0; padding: 0; }
@@ -21,7 +22,7 @@
             padding: 15px;
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            width: 220px;
+            width: 230px;
         }
 
         button {
@@ -45,7 +46,11 @@
 
 <div class="controls">
     <h3>Women Safety</h3>
+
     <button class="sos-btn" onclick="triggerSOS()">🚨 SOS</button>
+    <button onclick="findNearby('police')">👮 Nearby Police</button>
+    <button onclick="findNearby('hospital')">🏥 Nearby Hospital</button>
+    <button onclick="routeToPolice()">🛣 Safe Route to Police</button>
 </div>
 
 <div id="map"></div>
@@ -55,6 +60,7 @@
 </audio>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -62,9 +68,9 @@
 
 <script>
 
-// 🔥 Firebase Config (Singapore Region Corrected)
+// 🔥 Firebase Config
 const firebaseConfig = {
-  apiKey: "AIzaSyBrJVLDQ1iiIEXDLrHLnwsrwOVbQn1Dx6k",
+  apiKey: "API KEY",
   authDomain: "women-safety-app-62766.firebaseapp.com",
   databaseURL: "https://women-safety-app-62766-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "women-safety-app-62766",
@@ -86,54 +92,35 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 
 var currentLat, currentLng;
 var userMarker = null;
+var routingControl = null;
 var userId = "user_" + Math.floor(Math.random() * 100000);
 
-// 📍 Get Live Location
-if (navigator.geolocation) {
+// 📍 Live Location
+navigator.geolocation.watchPosition(function(position) {
 
-    navigator.geolocation.watchPosition(
+    currentLat = position.coords.latitude;
+    currentLng = position.coords.longitude;
 
-        function(position) {
+    if (userMarker) {
+        userMarker.setLatLng([currentLat, currentLng]);
+    } else {
+        userMarker = L.marker([currentLat, currentLng])
+            .addTo(map)
+            .bindPopup("You are here")
+            .openPopup();
+    }
 
-            currentLat = position.coords.latitude;
-            currentLng = position.coords.longitude;
+    map.setView([currentLat, currentLng], 16);
 
-            if (userMarker) {
-                userMarker.setLatLng([currentLat, currentLng]);
-            } else {
-                userMarker = L.marker([currentLat, currentLng])
-                    .addTo(map)
-                    .bindPopup("You are here")
-                    .openPopup();
-            }
+    database.ref("users/" + userId).set({
+        latitude: currentLat,
+        longitude: currentLng,
+        timestamp: Date.now()
+    });
 
-            map.setView([currentLat, currentLng], 16);
+});
 
-            // 🔥 Save to Firebase
-            database.ref("users/" + userId).set({
-                latitude: currentLat,
-                longitude: currentLng,
-                timestamp: Date.now()
-            });
-
-        },
-
-        function(error) {
-            alert("Location error: " + error.message);
-        },
-
-        {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0
-        }
-    );
-
-} else {
-    alert("Geolocation not supported by this browser.");
-}
-
-// 🚨 SOS Function
+// 🚨 SOS
 function triggerSOS() {
 
     document.getElementById("sosSound").play();
@@ -149,6 +136,79 @@ function triggerSOS() {
     setTimeout(function () {
         window.location.href = "tel:112";
     }, 3000);
+}
+
+// 👮 Nearby Places
+function findNearby(type) {
+
+    if (!currentLat) {
+        alert("Location not detected yet");
+        return;
+    }
+
+    let query = `
+    [out:json];
+    node["amenity"="${type}"](around:3000,${currentLat},${currentLng});
+    out;
+    `;
+
+    fetch("https://overpass-api.de/api/interpreter", {
+        method: "POST",
+        body: query
+    })
+    .then(response => response.json())
+    .then(data => {
+
+        data.elements.forEach(place => {
+            L.marker([place.lat, place.lon])
+                .addTo(map)
+                .bindPopup(type.toUpperCase());
+        });
+
+    });
+}
+
+// 🛣 Safe Route to Nearest Police
+function routeToPolice() {
+
+    if (!currentLat) {
+        alert("Location not detected yet");
+        return;
+    }
+
+    let query = `
+    [out:json];
+    node["amenity"="police"](around:3000,${currentLat},${currentLng});
+    out 1;
+    `;
+
+    fetch("https://overpass-api.de/api/interpreter", {
+        method: "POST",
+        body: query
+    })
+    .then(response => response.json())
+    .then(data => {
+
+        if (data.elements.length === 0) {
+            alert("No police station found nearby");
+            return;
+        }
+
+        let police = data.elements[0];
+
+        if (routingControl) {
+            map.removeControl(routingControl);
+        }
+
+        routingControl = L.Routing.control({
+            waypoints: [
+                L.latLng(currentLat, currentLng),
+                L.latLng(police.lat, police.lon)
+            ],
+            routeWhileDragging: false
+        }).addTo(map);
+
+    });
 }
 
 </script>
