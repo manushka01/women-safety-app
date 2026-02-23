@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css"/>
 
     <style>
-        body { margin: 0; padding: 0; }
+        body { margin: 0; padding: 0; transition: 0.3s; }
         #map { height: 100vh; width: 100%; }
 
         .controls {
@@ -22,6 +22,7 @@
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             width: 240px;
+            transition: 0.3s;
         }
 
         input {
@@ -47,6 +48,18 @@
         .route-btn { background: #007bff; color: white; }
         .heat-btn { background: orange; color: white; }
         .search-btn { background: #28a745; color: white; }
+        .share-btn { background: #6f42c1; color: white; }
+        .dark-btn { background: black; color: white; }
+
+        .dark-mode {
+            background: #121212;
+            color: white;
+        }
+
+        .dark-mode .controls {
+            background: #1e1e1e;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -60,6 +73,9 @@
 
     <input type="text" id="locationInput" placeholder="Search location...">
     <button class="search-btn" onclick="searchLocation()">🔎 Search</button>
+
+    <button class="share-btn" onclick="shareLocation()">📤 Share My Location</button>
+    <button class="dark-btn" onclick="toggleDarkMode()">🌙 Dark Mode</button>
 </div>
 
 <div id="map"></div>
@@ -83,7 +99,6 @@ var heatLayer = null;
 
 // 📍 Live Location
 navigator.geolocation.watchPosition(function(position) {
-
     currentLat = position.coords.latitude;
     currentLng = position.coords.longitude;
 
@@ -112,15 +127,10 @@ function triggerSOS() {
 
 // 🛣 Safe Route
 function safeRoute() {
-    if (!currentLat) {
-        alert("Location not detected yet");
-        return;
-    }
+    if (!currentLat) return alert("Location not detected yet");
 
     searchRoute("police", function(found) {
-        if (!found) {
-            searchRoute("hospital");
-        }
+        if (!found) searchRoute("hospital");
     });
 }
 
@@ -146,9 +156,7 @@ function searchRoute(type, callback) {
 
         let place = data.elements[0];
 
-        if (routingControl) {
-            map.removeControl(routingControl);
-        }
+        if (routingControl) map.removeControl(routingControl);
 
         routingControl = L.Routing.control({
             waypoints: [
@@ -182,24 +190,17 @@ function showHeatmap() {
     }).addTo(map);
 }
 
-// 🔎 Search Location Feature
+// 🔎 Search
 function searchLocation() {
 
     let query = document.getElementById("locationInput").value;
-
-    if (!query) {
-        alert("Enter a location to search");
-        return;
-    }
+    if (!query) return alert("Enter location");
 
     fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`)
     .then(response => response.json())
     .then(data => {
 
-        if (data.length === 0) {
-            alert("Location not found");
-            return;
-        }
+        if (data.length === 0) return alert("Location not found");
 
         let lat = data[0].lat;
         let lon = data[0].lon;
@@ -210,6 +211,23 @@ function searchLocation() {
 
         map.setView([lat, lon], 15);
     });
+}
+
+// 📤 Share Location
+function shareLocation() {
+    if (!currentLat) return alert("Location not ready");
+
+    let link = `https://www.google.com/maps?q=${currentLat},${currentLng}`;
+
+    navigator.clipboard.writeText(link);
+    alert("Location link copied!");
+
+    window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent(link), "_blank");
+}
+
+// 🌙 Dark Mode
+function toggleDarkMode() {
+    document.body.classList.toggle("dark-mode");
 }
 
 </script>
