@@ -5,7 +5,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css"/>
 
@@ -22,7 +21,7 @@
             padding: 15px;
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            width: 230px;
+            width: 240px;
         }
 
         button {
@@ -50,40 +49,17 @@
     <button class="sos-btn" onclick="triggerSOS()">🚨 SOS</button>
     <button onclick="findNearby('police')">👮 Nearby Police</button>
     <button onclick="findNearby('hospital')">🏥 Nearby Hospital</button>
-    <button onclick="routeToPolice()">🛣 Safe Route to Police</button>
+    <button onclick="routeTo('police')">🛣 Route to Police</button>
+    <button onclick="routeTo('hospital')">🛣 Route to Hospital</button>
 </div>
 
 <div id="map"></div>
 
-<audio id="sosSound">
-    <source src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" type="audio/ogg">
-</audio>
-
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-
 <script>
 
-// 🔥 Firebase Config
-const firebaseConfig = {
-  apiKey: "API KEY",
-  authDomain: "women-safety-app-62766.firebaseapp.com",
-  databaseURL: "https://women-safety-app-62766-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "women-safety-app-62766",
-  storageBucket: "women-safety-app-62766.firebasestorage.app",
-  messagingSenderId: "23376683007",
-  appId: "1:23376683007:web:7c5acf53b9fa53491751ca",
-  measurementId: "G-NHKJCFHNKD"
-};
-
-firebase.initializeApp(firebaseConfig);
-const database = firebase.database();
-
-// Map Setup
 var map = L.map('map').setView([20.5937, 78.9629], 5);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -93,7 +69,6 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 var currentLat, currentLng;
 var userMarker = null;
 var routingControl = null;
-var userId = "user_" + Math.floor(Math.random() * 100000);
 
 // 📍 Live Location
 navigator.geolocation.watchPosition(function(position) {
@@ -110,35 +85,23 @@ navigator.geolocation.watchPosition(function(position) {
             .openPopup();
     }
 
-    map.setView([currentLat, currentLng], 16);
-
-    database.ref("users/" + userId).set({
-        latitude: currentLat,
-        longitude: currentLng,
-        timestamp: Date.now()
-    });
-
+    map.setView([currentLat, currentLng], 15);
 });
 
 // 🚨 SOS
 function triggerSOS() {
 
-    document.getElementById("sosSound").play();
-
     if (currentLat && currentLng) {
 
-        let message = "🚨 I need help! My live location: https://www.google.com/maps?q=" 
+        let message = "🚨 I need help! My location: https://www.google.com/maps?q=" 
             + currentLat + "," + currentLng;
 
         window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent(message), "_blank");
+        setTimeout(() => { window.location.href = "tel:112"; }, 2000);
     }
-
-    setTimeout(function () {
-        window.location.href = "tel:112";
-    }, 3000);
 }
 
-// 👮 Nearby Places
+// 🔎 Nearby Search (Radius Increased to 10km)
 function findNearby(type) {
 
     if (!currentLat) {
@@ -148,7 +111,7 @@ function findNearby(type) {
 
     let query = `
     [out:json];
-    node["amenity"="${type}"](around:3000,${currentLat},${currentLng});
+    node["amenity"="${type}"](around:10000,${currentLat},${currentLng});
     out;
     `;
 
@@ -156,20 +119,24 @@ function findNearby(type) {
         method: "POST",
         body: query
     })
-    .then(response => response.json())
+    .then(res => res.json())
     .then(data => {
+
+        if (data.elements.length === 0) {
+            alert("No " + type + " found within 10km");
+            return;
+        }
 
         data.elements.forEach(place => {
             L.marker([place.lat, place.lon])
                 .addTo(map)
                 .bindPopup(type.toUpperCase());
         });
-
     });
 }
 
-// 🛣 Safe Route to Nearest Police
-function routeToPolice() {
+// 🛣 Universal Route Function
+function routeTo(type) {
 
     if (!currentLat) {
         alert("Location not detected yet");
@@ -178,7 +145,7 @@ function routeToPolice() {
 
     let query = `
     [out:json];
-    node["amenity"="police"](around:3000,${currentLat},${currentLng});
+    node["amenity"="${type}"](around:10000,${currentLat},${currentLng});
     out 1;
     `;
 
@@ -186,15 +153,15 @@ function routeToPolice() {
         method: "POST",
         body: query
     })
-    .then(response => response.json())
+    .then(res => res.json())
     .then(data => {
 
         if (data.elements.length === 0) {
-            alert("No police station found nearby");
+            alert("No " + type + " found within 10km");
             return;
         }
 
-        let police = data.elements[0];
+        let place = data.elements[0];
 
         if (routingControl) {
             map.removeControl(routingControl);
@@ -203,11 +170,10 @@ function routeToPolice() {
         routingControl = L.Routing.control({
             waypoints: [
                 L.latLng(currentLat, currentLng),
-                L.latLng(police.lat, police.lon)
+                L.latLng(place.lat, place.lon)
             ],
             routeWhileDragging: false
         }).addTo(map);
-
     });
 }
 
