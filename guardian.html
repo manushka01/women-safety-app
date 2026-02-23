@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Guardian Live Tracking</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+    <style>
+        body { margin:0; }
+        #map { height:100vh; }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+<script>
+
+// SAME Firebase Config
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "women-safety-app-62766.firebaseapp.com",
+  databaseURL: "YOUR_DATABASE_URL",
+  projectId: "women-safety-app-62766"
+};
+
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+var map = L.map('map').setView([20.5937, 78.9629], 5);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+}).addTo(map);
+
+var marker;
+
+// Listen to user location
+database.ref("users").limitToLast(1).on("child_added", function(snapshot) {
+
+    let data = snapshot.val();
+
+    if (marker) {
+        marker.setLatLng([data.latitude, data.longitude]);
+    } else {
+        marker = L.marker([data.latitude, data.longitude])
+            .addTo(map)
+            .bindPopup("User Live Location")
+            .openPopup();
+    }
+
+    map.setView([data.latitude, data.longitude], 16);
+});
+
+</script>
+
+</body>
+</html>
