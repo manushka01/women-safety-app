@@ -126,22 +126,23 @@ function toggleDarkMode(){
 function triggerSOS(){
 
   if(!userLat){
-    alert("Location not ready");
+    alert("Location not ready yet!");
     return;
   }
 
-  let mapLink="https://www.google.com/maps?q="+userLat+","+userLng;
+  let mapLink = "https://www.google.com/maps?q=" + userLat + "," + userLng;
 
-  // WhatsApp alert
+  // WhatsApp Message
   window.open(
-    "https://api.whatsapp.com/send?text="+
-    encodeURIComponent("🚨 EMERGENCY! I need help. My live location: "+mapLink)
+    "https://api.whatsapp.com/send?text=" +
+    encodeURIComponent("🚨 EMERGENCY! I need help. My live location: " + mapLink),
+    "_blank"
   );
 
-  // 112 Emergency Call (works on mobile)
+  // Direct Call
   setTimeout(function(){
-    window.location.href="tel:112";
-  },2000);
+    window.open("tel:112");
+  },1500);
 }
 
 
@@ -260,3 +261,4 @@ function shareLiveLocation(){
 </script>
 </body>
 </html>
+
