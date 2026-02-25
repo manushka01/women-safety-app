@@ -1,64 +1,150 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Guardian Live Tracking</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guardian Live Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
-    <style>
-        body { margin:0; }
-        #map { height:100vh; }
-    </style>
+  <style>
+    body { margin:0; display:flex; font-family:Arial; background:#0f172a; color:white; }
+    #sidebar {
+      width:300px;
+      background:#111827;
+      padding:15px;
+      overflow-y:auto;
+      border-right:2px solid #1f2937;
+    }
+    #map { flex:1; height:100vh; }
+
+    .user-card {
+      padding:10px;
+      margin-bottom:10px;
+      border-radius:8px;
+      background:#1f2937;
+      cursor:pointer;
+      transition:0.3s;
+    }
+    .user-card:hover { background:#374151; }
+
+    .online { color:#22c55e; font-weight:bold; }
+    .offline { color:#ef4444; font-weight:bold; }
+
+    .header {
+      font-size:20px;
+      margin-bottom:15px;
+      text-align:center;
+      font-weight:bold;
+    }
+
+    .clock {
+      text-align:center;
+      margin-bottom:10px;
+      font-size:14px;
+      color:#94a3b8;
+    }
+  </style>
 </head>
+
 <body>
+
+<div id="sidebar">
+  <div class="header">🛡 Guardian Dashboard</div>
+  <div class="clock" id="clock"></div>
+  <div id="userList"></div>
+</div>
 
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
 <script>
 
-// SAME Firebase Config
+// Firebase Config (same as index)
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
+  apiKey: "AIzaSyBrJVLDQ1iiIEXDLrHLnwsrwOVbQn1Dx6k",
   authDomain: "women-safety-app-62766.firebaseapp.com",
-  databaseURL: "YOUR_DATABASE_URL",
-  projectId: "women-safety-app-62766"
+  databaseURL: "https://women-safety-app-62766-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "women-safety-app-62766",
+  storageBucket: "women-safety-app-62766.firebasestorage.app",
+  messagingSenderId: "23376683007",
+  appId: "1:23376683007:web:7c5acf53b9fa53491751ca"
 };
 
 firebase.initializeApp(firebaseConfig);
-const database = firebase.database();
+const db = firebase.database();
 
-var map = L.map('map').setView([20.5937, 78.9629], 5);
+// Map Init
+var map = L.map('map').setView([26.8467,80.9462], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap'
-}).addTo(map);
+var markers = {};
+var trails = {};
+var userListDiv = document.getElementById("userList");
 
-var marker;
+// Live Clock
+setInterval(()=>{
+  document.getElementById("clock").innerText =
+    "System Time: " + new Date().toLocaleString();
+},1000);
 
-// Listen to user location
-database.ref("users").limitToLast(1).on("child_added", function(snapshot) {
+// Listen All Users
+db.ref("users").on("value", snapshot => {
 
-    let data = snapshot.val();
+  userListDiv.innerHTML="";
 
-    if (marker) {
-        marker.setLatLng([data.latitude, data.longitude]);
+  snapshot.forEach(child => {
+
+    let userId = child.key;
+    let data = child.val();
+    let lat = data.lat;
+    let lng = data.lng;
+    let lastTime = data.time;
+
+    if(!lat || !lng) return;
+
+    let now = Date.now();
+    let diff = (now - lastTime)/1000;
+
+    let isOnline = diff < 15;
+
+    // Update Marker
+    if(!markers[userId]){
+      markers[userId] = L.marker([lat,lng]).addTo(map)
+        .bindPopup(userId);
+
+      trails[userId] = L.polyline([[lat,lng]], {color:'blue'}).addTo(map);
     } else {
-        marker = L.marker([data.latitude, data.longitude])
-            .addTo(map)
-            .bindPopup("User Live Location")
-            .openPopup();
+      markers[userId].setLatLng([lat,lng]);
+      trails[userId].addLatLng([lat,lng]);
     }
 
-    map.setView([data.latitude, data.longitude], 16);
+    // Create Sidebar Card
+    let card = document.createElement("div");
+    card.className="user-card";
+    card.innerHTML=`
+      <div><strong>${userId}</strong></div>
+      <div class="${isOnline ? 'online':'offline'}">
+        ${isOnline ? '🟢 Online':'🔴 Offline'}
+      </div>
+      <div>Last Seen: ${Math.floor(diff)} sec ago</div>
+    `;
+
+    card.onclick = ()=>{
+      map.setView([lat,lng],17);
+      markers[userId].openPopup();
+    };
+
+    userListDiv.appendChild(card);
+
+  });
+
 });
 
 </script>
-
 </body>
 </html>
