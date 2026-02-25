@@ -123,25 +123,25 @@ function toggleDarkMode(){
 
 
 // 🚨 SOS (UPDATED WITH 112 CALL)
+// 🚨 SOS (FINAL FIXED - ANDROID WORKING)
 function triggerSOS(){
 
   if(!userLat){
-    alert("Location not ready yet!");
+    alert("Location not ready");
     return;
   }
 
-  let mapLink = "https://www.google.com/maps?q=" + userLat + "," + userLng;
+  let mapLink="https://www.google.com/maps?q="+userLat+","+userLng;
 
-  // WhatsApp Message
-  window.open(
-    "https://api.whatsapp.com/send?text=" +
-    encodeURIComponent("🚨 EMERGENCY! I need help. My live location: " + mapLink),
-    "_blank"
-  );
+  // 1️⃣ Pehle Direct 112 Call (User Click Event Ke Andar)
+  window.location.href="tel:112";
 
-  // Direct Call
+  // 2️⃣ 1.5 sec baad WhatsApp Open
   setTimeout(function(){
-    window.open("tel:112");
+    window.open(
+      "https://api.whatsapp.com/send?text="+
+      encodeURIComponent("🚨 EMERGENCY! I need help. My live location: "+mapLink)
+    );
   },1500);
 }
 
@@ -261,4 +261,5 @@ function shareLiveLocation(){
 </script>
 </body>
 </html>
+
 
