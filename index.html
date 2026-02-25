@@ -40,6 +40,7 @@
   <button onclick="toggleDarkMode()">🌙 Dark</button>
   <button onclick="triggerSOS()">🚨 SOS</button>
   <button onclick="startVoiceSOS()">🎤 Voice</button>
+  <button onclick="fakeCall()">📞 Fake Call</button>
 
   <input type="text" id="searchInput" placeholder="Search location">
   <button onclick="searchLocation()">Search</button>
@@ -69,12 +70,10 @@ var userLat,userLng,userMarker;
 var searchedLat=null, searchedLng=null;
 var routingControl;
 var heatLayer;
-
-// Movement Trail
 var movementPath = [];
 var movementLine = null;
+var policeMarkers=[];
 
-// Demo danger zones
 var dangerZones=[
   [26.850,80.949,0.8],
   [26.840,80.940,0.7],
@@ -89,6 +88,9 @@ navigator.geolocation.watchPosition(function(pos){
   userLat=pos.coords.latitude;
   userLng=pos.coords.longitude;
 
+  localStorage.setItem("liveLat", userLat);
+  localStorage.setItem("liveLng", userLng);
+
   if(userMarker){
     userMarker.setLatLng([userLat,userLng]);
   } else {
@@ -98,32 +100,30 @@ navigator.geolocation.watchPosition(function(pos){
 
   map.setView([userLat,userLng],16);
 
-  movementPath.push([userLat, userLng]);
+  movementPath.push([userLat,userLng]);
 
-  if (!movementLine) {
-    movementLine = L.polyline(movementPath, { color: 'blue' }).addTo(map);
+  if(!movementLine){
+    movementLine=L.polyline(movementPath,{color:'blue'}).addTo(map);
   } else {
     movementLine.setLatLngs(movementPath);
   }
 
   calculateRisk();
   checkDangerZone();
+  findNearbyPolice();
 
 }, function(){
   alert("Please allow location access");
 }, {enableHighAccuracy:true});
 
-
-// 🌙 Dark Mode
+// Dark Mode
 function toggleDarkMode(){
   if(isDark){ map.removeLayer(darkLayer); map.addLayer(lightLayer); }
   else { map.removeLayer(lightLayer); map.addLayer(darkLayer); }
   isDark=!isDark;
 }
 
-
-// 🚨 SOS (UPDATED WITH 112 CALL)
-// 🚨 SOS (FINAL FIXED - ANDROID WORKING)
+// SOS
 function triggerSOS(){
 
   if(!userLat){
@@ -133,10 +133,8 @@ function triggerSOS(){
 
   let mapLink="https://www.google.com/maps?q="+userLat+","+userLng;
 
-  // 1️⃣ Pehle Direct 112 Call (User Click Event Ke Andar)
   window.location.href="tel:112";
 
-  // 2️⃣ 1.5 sec baad WhatsApp Open
   setTimeout(function(){
     window.open(
       "https://api.whatsapp.com/send?text="+
@@ -145,8 +143,7 @@ function triggerSOS(){
   },1500);
 }
 
-
-// 🎤 Voice SOS
+// Voice SOS
 function startVoiceSOS(){
   const rec=new(window.SpeechRecognition||window.webkitSpeechRecognition)();
   rec.start();
@@ -157,6 +154,13 @@ function startVoiceSOS(){
   };
 }
 
+// Fake Call
+function fakeCall(){
+  alert("📞 Incoming Call from: Mom");
+  setTimeout(function(){
+    alert("📞 Talking...");
+  },2000);
+}
 
 // Search
 function searchLocation(){
@@ -164,24 +168,21 @@ function searchLocation(){
   if(!location) return alert("Enter location");
 
   fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${location}`)
-    .then(res=>res.json())
-    .then(data=>{
-      if(data.length>0){
+  .then(res=>res.json())
+  .then(data=>{
+    if(data.length>0){
+      searchedLat=parseFloat(data[0].lat);
+      searchedLng=parseFloat(data[0].lon);
 
-        searchedLat=parseFloat(data[0].lat);
-        searchedLng=parseFloat(data[0].lon);
+      map.setView([searchedLat,searchedLng],15);
 
-        map.setView([searchedLat,searchedLng],15);
-
-        L.marker([searchedLat,searchedLng])
-          .addTo(map)
-          .bindPopup(location)
-          .openPopup();
-
-      } else alert("Location not found");
-    });
+      L.marker([searchedLat,searchedLng])
+        .addTo(map)
+        .bindPopup(location)
+        .openPopup();
+    }
+  });
 }
-
 
 // Safe Route
 function safeRoute(){
@@ -199,13 +200,11 @@ function safeRoute(){
   }).addTo(map);
 }
 
-
 // Heatmap
 function toggleHeatmap(){
   if(map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
   else map.addLayer(heatLayer);
 }
-
 
 // Danger Alert
 function checkDangerZone(){
@@ -217,10 +216,8 @@ function checkDangerZone(){
   });
 }
 
-
-// AI Risk
+// Risk
 function calculateRisk(){
-
   let score=0;
   let hour=new Date().getHours();
 
@@ -247,19 +244,46 @@ function calculateRisk(){
   }
 }
 
+// Police Nearby
+function findNearbyPolice(){
+
+  if(!userLat) return;
+
+  policeMarkers.forEach(m=>map.removeLayer(m));
+  policeMarkers=[];
+
+  let query=`
+  [out:json];
+  node["amenity"="police"](around:3000,${userLat},${userLng});
+  out;
+  `;
+
+  fetch("https://overpass-api.de/api/interpreter",{
+    method:"POST",
+    body:query
+  })
+  .then(res=>res.json())
+  .then(data=>{
+    data.elements.forEach(station=>{
+      let marker=L.marker([station.lat,station.lon])
+        .addTo(map)
+        .bindPopup("🚓 Police Station");
+
+      policeMarkers.push(marker);
+    });
+  });
+}
 
 // Share
 function shareLiveLocation(){
   if(!userLat) return alert("Location not ready");
 
-  var link=window.location.origin+"/guardian.html?lat="+userLat+"&lng="+userLng;
+  var link=window.location.origin+"/guardian.html";
 
   window.open("https://api.whatsapp.com/send?text="+
-    encodeURIComponent("Track my location: "+link));
+    encodeURIComponent("Track my live location: "+link));
 }
 
 </script>
 </body>
 </html>
-
-
