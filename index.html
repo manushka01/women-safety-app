@@ -10,23 +10,8 @@
   <style>
     body { margin:0; font-family:Arial; }
     #map { height:85vh; width:100%; }
-
-    .top-bar {
-      padding:10px;
-      text-align:center;
-      background:#b30021;
-      color:white;
-    }
-
-    .risk-box {
-      text-align:center;
-      padding:8px;
-      font-weight:bold;
-      font-size:18px;
-      background:#111;
-      color:white;
-    }
-
+    .top-bar { padding:10px; text-align:center; background:#b30021; color:white; }
+    .risk-box { text-align:center; padding:8px; font-weight:bold; font-size:18px; background:#111; color:white; }
     button { padding:8px; margin:5px; border:none; border-radius:5px; cursor:pointer; }
     input { padding:8px; margin:5px; width:200px; }
   </style>
@@ -36,15 +21,12 @@
 
 <div class="top-bar">
   <h2>Women Safety AI Map</h2>
-
   <button onclick="toggleDarkMode()">🌙 Dark</button>
   <button onclick="triggerSOS()">🚨 SOS</button>
   <button onclick="startVoiceSOS()">🎤 Voice</button>
   <button onclick="fakeCall()">📞 Fake Call</button>
-
   <input type="text" id="searchInput" placeholder="Search location">
   <button onclick="searchLocation()">Search</button>
-
   <button onclick="safeRoute()">Safe Route</button>
   <button onclick="toggleHeatmap()">🔥 Heatmap</button>
   <button onclick="shareLiveLocation()">🔵 Share</button>
@@ -57,31 +39,34 @@
 <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 
-<!-- 🔥 Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
 <script>
 
-/* 🔥 FIREBASE CONFIG */
+/* FIREBASE CONFIG */
 const firebaseConfig = {
-  apiKey: "API KEY",
+  apiKey: "AIzaSyBrJVLDQ1iiIEXDLrHLnwsrwOVbQn1Dx6k",
   authDomain: "women-safety-app-62766.firebaseapp.com",
   databaseURL: "https://women-safety-app-62766-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "women-safety-app-62766",
   storageBucket: "women-safety-app-62766.firebasestorage.app",
   messagingSenderId: "23376683007",
-  appId: "1:23376683007:web:7c5acf53b9fa53491751ca",
-  measurementId: "G-NHKJCFHNKD"
+  appId: "1:23376683007:web:7c5acf53b9fa53491751ca"
 };
 
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
-/* 🔥 MAP START */
+/* UNIQUE USER ID */
+let userId = localStorage.getItem("userId");
+if (!userId) {
+  userId = "user_" + Math.floor(Math.random() * 100000);
+  localStorage.setItem("userId", userId);
+}
 
+/* MAP INIT */
 var map = L.map('map').setView([26.8467, 80.9462], 13);
-
 var lightLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 var darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png');
 
@@ -90,8 +75,8 @@ var userLat,userLng,userMarker;
 var searchedLat=null, searchedLng=null;
 var routingControl;
 var heatLayer;
-var movementPath = [];
-var movementLine = null;
+var movementPath=[];
+var movementLine=null;
 var policeMarkers=[];
 
 var dangerZones=[
@@ -102,14 +87,11 @@ var dangerZones=[
 
 heatLayer=L.heatLayer(dangerZones,{radius:25});
 
-/* 🔵 LIVE LOCATION */
+/* LIVE LOCATION */
 navigator.geolocation.watchPosition(function(pos){
 
   userLat=pos.coords.latitude;
   userLng=pos.coords.longitude;
-
-  localStorage.setItem("liveLat", userLat);
-  localStorage.setItem("liveLng", userLng);
 
   if(userMarker){
     userMarker.setLatLng([userLat,userLng]);
@@ -132,40 +114,50 @@ navigator.geolocation.watchPosition(function(pos){
   checkDangerZone();
   findNearbyPolice();
 
-  // 🔥 SEND LOCATION TO FIREBASE
-  database.ref("users/user1").set({
-    lat: userLat,
-    lng: userLng,
-    time: Date.now()
-  });
+  database.ref("users/" + userId).update({
+  lat:userLat,
+  lng:userLng,
+  time:Date.now(),
+  sos:false
+});
 
 }, function(){
   alert("Please allow location access");
-}, {enableHighAccuracy:true});
+},{enableHighAccuracy:true});
 
-/* 🌙 DARK MODE */
+/* DARK MODE */
 function toggleDarkMode(){
   if(isDark){ map.removeLayer(darkLayer); map.addLayer(lightLayer); }
   else { map.removeLayer(lightLayer); map.addLayer(darkLayer); }
   isDark=!isDark;
 }
 
-/* 🚨 SOS */
+/* SOS */
 function triggerSOS(){
-  if(!userLat){ alert("Location not ready"); return; }
+
+  if(!userLat){
+    alert("Location not ready");
+    return;
+  }
+
+  database.ref("users/" + userId).update({
+    sos:true,
+    lat:userLat,
+    lng:userLng,
+    time:Date.now()
+  });
 
   let mapLink="https://www.google.com/maps?q="+userLat+","+userLng;
+
   window.location.href="tel:112";
 
   setTimeout(function(){
-    window.open(
-      "https://api.whatsapp.com/send?text="+
-      encodeURIComponent("🚨 EMERGENCY! I need help. My live location: "+mapLink)
-    );
+    window.open("https://api.whatsapp.com/send?text="+
+    encodeURIComponent("🚨 EMERGENCY! I need help. My live location: "+mapLink));
   },1500);
 }
 
-/* 🎤 VOICE SOS */
+/* VOICE SOS */
 function startVoiceSOS(){
   const rec=new(window.SpeechRecognition||window.webkitSpeechRecognition)();
   rec.start();
@@ -176,15 +168,13 @@ function startVoiceSOS(){
   };
 }
 
-/* 📞 FAKE CALL */
+/* FAKE CALL */
 function fakeCall(){
   alert("📞 Incoming Call from: Mom");
-  setTimeout(function(){
-    alert("📞 Talking...");
-  },2000);
+  setTimeout(()=>alert("📞 Talking..."),2000);
 }
 
-/* 🔎 SEARCH */
+/* SEARCH */
 function searchLocation(){
   var location=document.getElementById("searchInput").value;
   if(!location) return alert("Enter location");
@@ -195,118 +185,76 @@ function searchLocation(){
     if(data.length>0){
       searchedLat=parseFloat(data[0].lat);
       searchedLng=parseFloat(data[0].lon);
-
       map.setView([searchedLat,searchedLng],15);
-
-      L.marker([searchedLat,searchedLng])
-        .addTo(map)
-        .bindPopup(location)
-        .openPopup();
+      L.marker([searchedLat,searchedLng]).addTo(map).bindPopup(location).openPopup();
     }
   });
 }
 
-/* 🛣 SAFE ROUTE */
+/* SAFE ROUTE */
 function safeRoute(){
   if(!userLat) return alert("Location not ready");
   if(!searchedLat) return alert("Search a destination first");
-
   if(routingControl) map.removeControl(routingControl);
-
   routingControl=L.Routing.control({
-    waypoints:[
-      L.latLng(userLat,userLng),
-      L.latLng(searchedLat,searchedLng)
-    ],
-    routeWhileDragging:false
+    waypoints:[L.latLng(userLat,userLng),L.latLng(searchedLat,searchedLng)]
   }).addTo(map);
 }
 
-/* 🔥 HEATMAP */
+/* HEATMAP */
 function toggleHeatmap(){
   if(map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
   else map.addLayer(heatLayer);
 }
 
-/* ⚠ DANGER ZONE */
+/* DANGER ZONE */
 function checkDangerZone(){
   dangerZones.forEach(zone=>{
     var dist=map.distance([userLat,userLng],[zone[0],zone[1]]);
-    if(dist<200){
-      alert("⚠ Warning: Unsafe Area!");
-    }
+    if(dist<200) alert("⚠ Warning: Unsafe Area!");
   });
 }
 
-/* 📊 RISK */
+/* RISK */
 function calculateRisk(){
   let score=0;
   let hour=new Date().getHours();
-
-  if(hour>=20 || hour<=5) score+=40;
-
+  if(hour>=20||hour<=5) score+=40;
   dangerZones.forEach(zone=>{
     let dist=map.distance([userLat,userLng],[zone[0],zone[1]]);
     if(dist<300) score+=50;
   });
-
   let status=document.getElementById("riskStatus");
-
-  if(score>=60){
-    status.innerHTML="🔴 High Risk Area";
-    status.style.color="red";
-  }
-  else if(score>=30){
-    status.innerHTML="🟡 Medium Risk Area";
-    status.style.color="orange";
-  }
-  else{
-    status.innerHTML="🟢 Safe Area";
-    status.style.color="lime";
-  }
+  if(score>=60){ status.innerHTML="🔴 High Risk Area"; status.style.color="red"; }
+  else if(score>=30){ status.innerHTML="🟡 Medium Risk Area"; status.style.color="orange"; }
+  else{ status.innerHTML="🟢 Safe Area"; status.style.color="lime"; }
 }
 
-/* 🚓 POLICE */
+/* POLICE */
 function findNearbyPolice(){
-
   if(!userLat) return;
-
   policeMarkers.forEach(m=>map.removeLayer(m));
   policeMarkers=[];
-
-  let query=`
-  [out:json];
-  node["amenity"="police"](around:3000,${userLat},${userLng});
-  out;
-  `;
-
-  fetch("https://overpass-api.de/api/interpreter",{
-    method:"POST",
-    body:query
-  })
+  let query=`[out:json];node["amenity"="police"](around:3000,${userLat},${userLng});out;`;
+  fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:query})
   .then(res=>res.json())
   .then(data=>{
     data.elements.forEach(station=>{
-      let marker=L.marker([station.lat,station.lon])
-        .addTo(map)
-        .bindPopup("🚓 Police Station");
-
+      let marker=L.marker([station.lat,station.lon]).addTo(map)
+      .bindPopup("🚓 Police Station");
       policeMarkers.push(marker);
     });
   });
 }
 
-/* 🔵 SHARE */
+/* SHARE */
 function shareLiveLocation(){
   if(!userLat) return alert("Location not ready");
-
   var link=window.location.origin+"/guardian.html";
-
   window.open("https://api.whatsapp.com/send?text="+
-    encodeURIComponent("Track my live location: "+link));
+  encodeURIComponent("Track my live location: "+link));
 }
 
 </script>
 </body>
 </html>
-
