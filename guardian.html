@@ -8,31 +8,20 @@
 
   <style>
     body { margin:0; display:flex; font-family:Arial; background:#0f172a; color:white; }
+
     #sidebar {
-      width:300px;
+      width:320px;
       background:#111827;
       padding:15px;
       overflow-y:auto;
       border-right:2px solid #1f2937;
     }
+
     #map { flex:1; height:100vh; }
-
-    .user-card {
-      padding:10px;
-      margin-bottom:10px;
-      border-radius:8px;
-      background:#1f2937;
-      cursor:pointer;
-      transition:0.3s;
-    }
-    .user-card:hover { background:#374151; }
-
-    .online { color:#22c55e; font-weight:bold; }
-    .offline { color:#ef4444; font-weight:bold; }
 
     .header {
       font-size:20px;
-      margin-bottom:15px;
+      margin-bottom:10px;
       text-align:center;
       font-weight:bold;
     }
@@ -43,14 +32,59 @@
       font-size:14px;
       color:#94a3b8;
     }
+
+    #statsBox {
+      background:#1e293b;
+      padding:12px;
+      border-radius:10px;
+      margin-bottom:15px;
+      text-align:center;
+      font-size:14px;
+      box-shadow:0 4px 10px rgba(0,0,0,0.4);
+    }
+
+    .user-card {
+      padding:12px;
+      margin-bottom:12px;
+      border-radius:12px;
+      background:linear-gradient(145deg,#1f2937,#111827);
+      box-shadow:0 4px 10px rgba(0,0,0,0.4);
+      cursor:pointer;
+      transition:0.3s;
+    }
+
+    .user-card:hover {
+      transform:scale(1.03);
+      background:#374151;
+    }
+
+    .online { color:#22c55e; font-weight:bold; }
+    .offline { color:#ef4444; font-weight:bold; }
+
+    .sos-alert {
+      background:#7f1d1d !important;
+      border:2px solid red;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      50% { opacity:0.6; }
+    }
+
   </style>
 </head>
 
 <body>
 
 <div id="sidebar">
-  <div class="header">🛡 Guardian Dashboard</div>
+  <div class="header">🛡 Guardian Control Room</div>
   <div class="clock" id="clock"></div>
+
+  <div id="statsBox">
+    <div>Total Users: <span id="totalUsers">0</span></div>
+    <div>Online Users: <span id="onlineUsers">0</span></div>
+  </div>
+
   <div id="userList"></div>
 </div>
 
@@ -58,15 +92,13 @@
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
 <script>
 
-// Firebase Config (same as index)
 const firebaseConfig = {
-  apiKey: "AIzaSyBrJVLDQ1iiIEXDLrHLnwsrwOVbQn1Dx6k",
+  apiKey: "YOUR_API_KEY",
   authDomain: "women-safety-app-62766.firebaseapp.com",
   databaseURL: "https://women-safety-app-62766-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "women-safety-app-62766",
@@ -78,7 +110,6 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// Map Init
 var map = L.map('map').setView([26.8467,80.9462], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
@@ -86,16 +117,19 @@ var markers = {};
 var trails = {};
 var userListDiv = document.getElementById("userList");
 
-// Live Clock
+let alertedUsers = {}; // prevent repeated alerts
+
 setInterval(()=>{
   document.getElementById("clock").innerText =
     "System Time: " + new Date().toLocaleString();
 },1000);
 
-// Listen All Users
 db.ref("users").on("value", snapshot => {
 
   userListDiv.innerHTML="";
+
+  let totalCount = 0;
+  let onlineCount = 0;
 
   snapshot.forEach(child => {
 
@@ -104,34 +138,51 @@ db.ref("users").on("value", snapshot => {
     let lat = data.lat;
     let lng = data.lng;
     let lastTime = data.time;
+    let isSOS = data.sos === true;
 
     if(!lat || !lng) return;
 
+    totalCount++;
+
     let now = Date.now();
     let diff = (now - lastTime)/1000;
-
     let isOnline = diff < 15;
 
-    // Update Marker
+    if(isOnline) onlineCount++;
+
+    // Marker Update
     if(!markers[userId]){
       markers[userId] = L.marker([lat,lng]).addTo(map)
         .bindPopup(userId);
-
       trails[userId] = L.polyline([[lat,lng]], {color:'blue'}).addTo(map);
     } else {
       markers[userId].setLatLng([lat,lng]);
       trails[userId].addLatLng([lat,lng]);
     }
 
-    // Create Sidebar Card
+    // Create Card
     let card = document.createElement("div");
     card.className="user-card";
+
+    if(isSOS){
+      card.classList.add("sos-alert");
+
+      if(!alertedUsers[userId]){
+        alert("🚨 EMERGENCY ALERT from " + userId);
+        map.setView([lat,lng],17);
+        alertedUsers[userId] = true;
+      }
+    } else {
+      alertedUsers[userId] = false;
+    }
+
     card.innerHTML=`
       <div><strong>${userId}</strong></div>
       <div class="${isOnline ? 'online':'offline'}">
         ${isOnline ? '🟢 Online':'🔴 Offline'}
       </div>
       <div>Last Seen: ${Math.floor(diff)} sec ago</div>
+      ${isSOS ? '<div style="color:red;font-weight:bold;">🚨 EMERGENCY ACTIVE</div>' : ''}
     `;
 
     card.onclick = ()=>{
@@ -142,6 +193,9 @@ db.ref("users").on("value", snapshot => {
     userListDiv.appendChild(card);
 
   });
+
+  document.getElementById("totalUsers").innerText = totalCount;
+  document.getElementById("onlineUsers").innerText = onlineCount;
 
 });
 
