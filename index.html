@@ -23,6 +23,7 @@
   <h2>Women Safety AI Map</h2>
   <button onclick="toggleDarkMode()">🌙 Dark</button>
   <button onclick="triggerSOS()">🚨 SOS</button>
+  <button onclick="resetSOS()">✅ Safe</button>
   <button onclick="startVoiceSOS()">🎤 Voice</button>
   <button onclick="fakeCall()">📞 Fake Call</button>
   <input type="text" id="searchInput" placeholder="Search location">
@@ -253,6 +254,12 @@ function shareLiveLocation(){
   var link=window.location.origin+"/guardian.html";
   window.open("https://api.whatsapp.com/send?text="+
   encodeURIComponent("Track my live location: "+link));
+}
+function resetSOS(){
+  database.ref("users/" + userId).update({
+    sos:false
+  });
+  alert("Status set to SAFE");
 }
 
 </script>
