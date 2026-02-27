@@ -142,11 +142,10 @@ function triggerSOS(){
   }
 
   database.ref("users/" + userId).update({
-    sos:true,
-    lat:userLat,
-    lng:userLng,
-    time:Date.now()
-  });
+  lat:userLat,
+  lng:userLng,
+  time:Date.now()
+});
 
   let mapLink="https://www.google.com/maps?q="+userLat+","+userLng;
 
