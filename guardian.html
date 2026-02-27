@@ -70,7 +70,6 @@
     @keyframes blink {
       50% { opacity:0.6; }
     }
-
   </style>
 </head>
 
@@ -90,15 +89,17 @@
 
 <div id="map"></div>
 
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<!-- 🔊 SOUND -->
+<audio id="sosSound" src="alert.mp3" preload="auto"></audio>
 
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
 <script>
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
+  apiKey: "AIzaSyBrJVLDQ1iiIEXDLrHLnwsrwOVbQn1Dx6k",
   authDomain: "women-safety-app-62766.firebaseapp.com",
   databaseURL: "https://women-safety-app-62766-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "women-safety-app-62766",
@@ -117,7 +118,16 @@ var markers = {};
 var trails = {};
 var userListDiv = document.getElementById("userList");
 
-let alertedUsers = {}; // prevent repeated alerts
+let alertedUsers = {};
+let soundEnabled = false;
+
+/* 🔓 UNLOCK SOUND AFTER FIRST CLICK */
+document.body.addEventListener("click", function(){
+  if(!soundEnabled){
+    soundEnabled = true;
+    console.log("Sound unlocked");
+  }
+});
 
 setInterval(()=>{
   document.getElementById("clock").innerText =
@@ -150,7 +160,7 @@ db.ref("users").on("value", snapshot => {
 
     if(isOnline) onlineCount++;
 
-    // Marker Update
+    // Marker update
     if(!markers[userId]){
       markers[userId] = L.marker([lat,lng]).addTo(map)
         .bindPopup(userId);
@@ -160,7 +170,6 @@ db.ref("users").on("value", snapshot => {
       trails[userId].addLatLng([lat,lng]);
     }
 
-    // Create Card
     let card = document.createElement("div");
     card.className="user-card";
 
@@ -168,8 +177,18 @@ db.ref("users").on("value", snapshot => {
       card.classList.add("sos-alert");
 
       if(!alertedUsers[userId]){
+
         alert("🚨 EMERGENCY ALERT from " + userId);
+
+        if(soundEnabled){
+          let sound = document.getElementById("sosSound");
+          sound.currentTime = 0;
+          sound.play();
+        }
+
         map.setView([lat,lng],17);
+        markers[userId].openPopup();
+
         alertedUsers[userId] = true;
       }
     } else {
